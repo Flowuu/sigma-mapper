@@ -20,10 +20,16 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\flogger.hpp">
+    <ClInclude Include="include\fLogger.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\ftil.hpp">
+    <ClInclude Include="include\fTil.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\fTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\injection\injection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
