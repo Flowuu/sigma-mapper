@@ -11,14 +11,12 @@ struct MAPPARAM {
 };
 
 class RAWFILE {
-   private:
-    void* buffer;
-
    public:
     std::string fileName;
     std::filesystem::path path;
     size_t size;
 
+    uint8_t* buffer;
     PE_HEADER headers;
 
     RAWFILE() = default;
@@ -31,7 +29,7 @@ class RAWFILE {
         size = GetFileSize(hFile, nullptr);
         if (!size) return;
 
-        buffer = malloc(size);
+        buffer = static_cast<uint8_t*>(malloc(size));
         if (!buffer) return;
 
         if (!ReadFile(hFile, buffer, static_cast<DWORD>(size), nullptr, nullptr)) return;
@@ -63,7 +61,8 @@ class TARGETPROC {
         if (!handle) return;
 
         if (method == INJMETHOD::MANUALMAP) {
-            remoteBuffer = std::bit_cast<uint8_t*>(VirtualAllocEx(handle, nullptr, file.size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+            remoteBuffer = std::bit_cast<uint8_t*>(
+                VirtualAllocEx(handle, nullptr, file.headers.OptionalHeader->SizeOfImage, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
             if (!remoteBuffer) return;
 
             remoteParam = VirtualAllocEx(handle, nullptr, sizeof(MAPPARAM), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
