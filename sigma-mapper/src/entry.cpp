@@ -37,8 +37,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (method != INJMETHOD::LOADLIBRARY && method != INJMETHOD::MANUALMAP)
-        method = static_cast<INJMETHOD>(console->getInput<unsigned int>("loadlibrary: 1 | manual map: 2"));
+    method = static_cast<INJMETHOD>(console->getInput<unsigned int>("loadlibrary: 1 | manual map: 2\n"));
+
+    if (method != INJMETHOD::LOADLIBRARY && method != INJMETHOD::MANUALMAP) {
+        console->report(LogLevel::error, "invalid method\n", argv[0]);
+        return 1;
+    }
 
     console->log(LogLevel::lightcyan, "[process info]\n");
     console->log("name -> %s\n", process.name.c_str());
@@ -58,8 +62,6 @@ int main(int argc, char** argv) {
             break;
         case INJMETHOD::MANUALMAP:
             console->log("MANUALMAP\n");
-            break;
-        default:
             break;
     }
 
