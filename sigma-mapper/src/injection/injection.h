@@ -13,7 +13,9 @@ class RAWFILE {
 
     PE_HEADER headers;
 
-    RAWFILE(const std::filesystem::path& inPath) : path(inPath) {
+    RAWFILE() = default;
+
+    RAWFILE(std::filesystem::path inPath) : fileName(""), path(inPath), buffer(nullptr), size(0) {
         fileName           = path.filename().string();
         SMART_HANDLE hFile = CreateFileA(path.string().c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
         if (!hFile) return;
