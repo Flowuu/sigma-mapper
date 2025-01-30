@@ -4,10 +4,6 @@
 #include <memory>
 #include <TlHelp32.h>
 
-#include <windows.h>
-
-#include <windows.h>
-
 struct SMART_HANDLE {
    private:
     HANDLE m_handle{INVALID_HANDLE_VALUE};
