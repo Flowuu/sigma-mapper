@@ -64,10 +64,10 @@ int main(int argc, char** argv) {
 
     switch (method) {
         case INJMETHOD::LOADLIBRARY:
-            console->log("LOADLIBRARY\n");
+            METHOD::loadLib(process, dll);
             break;
         case INJMETHOD::MANUALMAP:
-            console->log("MANUALMAP\n");
+            METHOD::manualMap(process, dll);
             break;
     }
 
