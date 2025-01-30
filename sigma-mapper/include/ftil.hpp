@@ -4,7 +4,7 @@
 #include <memory>
 #include <TlHelp32.h>
 
-struct Ftil {
+struct FTIL {
     DWORD getPId() {}
 
     bool getFileBuffer() {}

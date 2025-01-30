@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 #include <bit>
+#include <filesystem>
 
 constexpr size_t sizePage4K  = 0x1000;
 constexpr size_t sizePage2MB = sizePage4K * 512;
@@ -42,7 +43,7 @@ class SMART_HANDLE {
     }
 
     explicit operator bool() const { return m_handle != INVALID_HANDLE_VALUE; }
-    explicit operator HANDLE() const { return m_handle; }
+    operator HANDLE() const { return m_handle; }
 };
 
 class PE_HEADER {
