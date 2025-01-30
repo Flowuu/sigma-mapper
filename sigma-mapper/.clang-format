@@ -1,0 +1,11 @@
+# Format Style Options - Created with Clang Power Tools
+---
+BasedOnStyle: Google
+IndentWidth: 4
+ObjCBlockIndentWidth: 4
+AlignAfterOpenBracket: Align
+AllowAllParametersOfDeclarationOnNextLine: false
+AlignConsecutiveMacros: true
+AlignConsecutiveAssignments: true
+ColumnLimit: 160
+SortIncludes: Never
