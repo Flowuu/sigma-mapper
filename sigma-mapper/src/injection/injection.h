@@ -30,7 +30,7 @@ class RAWFILE {
         size = GetFileSize(hFile, nullptr);
         if (!size) return;
 
-        rawBuffer = static_cast<uint8_t*>(malloc(size));
+        rawBuffer = static_cast<uint8_t*>(VirtualAlloc(nullptr, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
         if (!rawBuffer) return;
 
         if (!ReadFile(hFile, rawBuffer, static_cast<DWORD>(size), nullptr, nullptr)) return;
@@ -38,11 +38,14 @@ class RAWFILE {
         headers = rawBuffer;
         if (!headers) return;
 
-        fixedBuffer = static_cast<uint8_t*>(malloc(headers.OptionalHeader->SizeOfImage));
+        fixedBuffer = static_cast<uint8_t*>(VirtualAlloc(nullptr, headers.OptionalHeader->SizeOfImage, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
         if (!rawBuffer) return;
     }
 
-    ~RAWFILE() { free(rawBuffer); }
+    ~RAWFILE() {
+        free(rawBuffer);
+        free(fixedBuffer);
+    }
 
     explicit operator bool() const { return size > 0 && rawBuffer != nullptr && headers; }
 };
