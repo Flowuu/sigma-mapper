@@ -2,6 +2,8 @@
 #include "../../include/fTil.hpp"
 #include "../../include/fLogger.hpp"
 
+enum class INJMETHOD : unsigned int { NONE, LOADLIBRARY, MANUALMAP };
+
 struct MAPPARAM {
     uint8_t* buffer;
     decltype(&LoadLibraryA) LoadLibraryAFunc;
@@ -55,21 +57,31 @@ class TARGETPROC {
     void* remoteParam;
     void* remoteFunc;
 
-    TARGETPROC(const std::string& procName, const RAWFILE& file) : name(procName) {
+    TARGETPROC(const std::string& procName, const RAWFILE& file, const INJMETHOD& method) : name(procName) {
         pId = util->getPId(name.c_str());
         if (!pId) return;
 
         handle = OpenProcess(PROCESS_ALL_ACCESS, 0, pId);
         if (!handle) return;
 
-        remoteBuffer = std::bit_cast<uint8_t*>(VirtualAllocEx(handle, nullptr, file.size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
-        if (!remoteBuffer) return;
+        if (method == INJMETHOD::MANUALMAP) {
+            remoteBuffer = std::bit_cast<uint8_t*>(VirtualAllocEx(handle, nullptr, file.size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+            if (!remoteBuffer) return;
 
-        remoteParam = VirtualAllocEx(handle, nullptr, sizeof(MAPPARAM), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-        if (!remoteParam) return;
+            remoteParam = VirtualAllocEx(handle, nullptr, sizeof(MAPPARAM), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+            if (!remoteParam) return;
 
-        remoteFunc = VirtualAllocEx(handle, nullptr, sizePage4K, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-        if (!remoteFunc) return;
+            remoteFunc = VirtualAllocEx(handle, nullptr, sizePage4K, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+            if (!remoteFunc) return;
+
+        } else if (method == INJMETHOD::LOADLIBRARY) {
+            remoteBuffer =
+                std::bit_cast<uint8_t*>(VirtualAllocEx(handle, nullptr, file.path.string().length() + 0x1, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+            if (!remoteBuffer) return;
+
+            remoteParam = remoteBuffer;
+            remoteFunc  = remoteBuffer;
+        }
     }
 
     ~TARGETPROC() {
@@ -80,8 +92,6 @@ class TARGETPROC {
 
     explicit operator bool() const { return handle && pId > 0 && remoteBuffer != nullptr && remoteParam != nullptr && remoteFunc != nullptr; }
 };
-
-enum class INJMETHOD : unsigned int { NONE, LOADLIBRARY, MANUALMAP };
 
 struct METHOD {
     static void manualMap();

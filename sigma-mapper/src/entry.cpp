@@ -31,12 +31,6 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    TARGETPROC process(procName, dll);
-    if (!process) {
-        console->report(LogLevel::error, "TARGETPROC: %s\n", console->getLastError().c_str());
-        return 1;
-    }
-
     method = static_cast<INJMETHOD>(console->getInput<unsigned int>("loadlibrary: 1 | manual map: 2\n"));
 
     if (method != INJMETHOD::LOADLIBRARY && method != INJMETHOD::MANUALMAP) {
@@ -44,12 +38,24 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    TARGETPROC process(procName, dll, method);
+    if (!process) {
+        console->report(LogLevel::error, "TARGETPROC: %s\n", console->getLastError().c_str());
+        return 1;
+    }
+
+    console->clear();
+
     console->log(LogLevel::lightcyan, "[process info]\n");
     console->log("name -> %s\n", process.name.c_str());
     console->log("id   -> %d\n", static_cast<int>(process.pId));
-    console->log("remote buffer ptr -> 0x%X\n", process.remoteBuffer);
-    console->log("remote param ptr  -> 0x%X\n", process.remoteParam);
-    console->log("remote func ptr   -> 0x%X\n\n", process.remoteFunc);
+    if (process.remoteBuffer != process.remoteParam) {
+        console->log("remote buffer ptr -> 0x%X\n", process.remoteBuffer);
+        console->log("remote param ptr  -> 0x%X\n", process.remoteParam);
+        console->log("remote func ptr   -> 0x%X\n\n", process.remoteFunc);
+    } else {
+        console->log("remote buffer ptr -> 0x%X\n\n", process.remoteBuffer);
+    }
 
     console->log(LogLevel::lightcyan, "[file info]\n");
     console->log("name -> %s\n", dll.fileName.c_str());
