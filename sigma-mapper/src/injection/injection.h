@@ -81,6 +81,8 @@ class TARGETPROC {
     explicit operator bool() const { return handle && pId > 0 && remoteBuffer != nullptr && remoteParam != nullptr && remoteFunc != nullptr; }
 };
 
+enum class INJMETHOD : unsigned int { NONE, LOADLIBRARY, MANUALMAP };
+
 struct METHOD {
     static void manualMap();
 };
