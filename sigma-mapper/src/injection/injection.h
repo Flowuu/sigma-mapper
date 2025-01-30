@@ -46,12 +46,10 @@ class RAWFILE {
 };
 
 class TARGETPROC {
-   private:
-    SMART_HANDLE handle;
-
    public:
     std::string name;
     DWORD pId;
+    SMART_HANDLE handle;
 
     uint8_t* remoteBuffer;
     void* remoteParam;
@@ -86,6 +84,9 @@ class TARGETPROC {
 
     ~TARGETPROC() {
         VirtualFreeEx(handle, remoteBuffer, 0, MEM_RELEASE);
+
+        if (remoteBuffer == remoteParam) return;
+
         VirtualFreeEx(handle, remoteParam, 0, MEM_RELEASE);
         VirtualFreeEx(handle, remoteFunc, 0, MEM_RELEASE);
     }
@@ -94,5 +95,6 @@ class TARGETPROC {
 };
 
 struct METHOD {
-    static void manualMap();
+    static void loadLib(const TARGETPROC& process, const RAWFILE& dll);
+    static void manualMap(const TARGETPROC& process, const RAWFILE& dll);
 };

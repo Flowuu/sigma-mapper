@@ -160,6 +160,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\entry.cpp" />
+    <ClCompile Include="src\injection\mLoadLibrary.cpp" />
+    <ClCompile Include="src\injection\mManualMap.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\fLogger.hpp" />
