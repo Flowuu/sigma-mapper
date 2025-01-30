@@ -9,7 +9,7 @@ int main(int argc, char** argv) {
     std::string procName;
 
     if (argc == 1) {
-        procName = console->getInput<std::string>("process -> ");
+        procName = console->getInput<std::string>("process   -> ");
         filePath = console->getInput<std::string>("file path -> ");
 
     } else if (argc == 2) {
