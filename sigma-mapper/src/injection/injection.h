@@ -2,6 +2,12 @@
 #include "../../include/fTil.hpp"
 #include "../../include/fLogger.hpp"
 
+struct MAPPARAM {
+    uint8_t* buffer;
+    decltype(&LoadLibraryA) LoadLibraryAFunc;
+    decltype(&GetProcAddress) GetProcAddressFunc;
+};
+
 class RAWFILE {
    private:
     void* buffer;
@@ -37,4 +43,44 @@ class RAWFILE {
     explicit operator bool() const { return size > 0 && buffer != nullptr && headers; }
 };
 
-class TARGETPROC {};
+class TARGETPROC {
+   private:
+    SMART_HANDLE handle;
+
+   public:
+    std::string name;
+    DWORD pId;
+
+    uint8_t* remoteBuffer;
+    void* remoteParam;
+    void* remoteFunc;
+
+    TARGETPROC(const std::string& procName, const RAWFILE& file) : name(procName) {
+        pId = util->getPId(name.c_str());
+        if (!pId) return;
+
+        handle = OpenProcess(PROCESS_ALL_ACCESS, 0, pId);
+        if (!handle) return;
+
+        remoteBuffer = std::bit_cast<uint8_t*>(VirtualAllocEx(handle, nullptr, file.size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+        if (!remoteBuffer) return;
+
+        remoteParam = VirtualAllocEx(handle, nullptr, sizeof(MAPPARAM), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        if (!remoteParam) return;
+
+        remoteFunc = VirtualAllocEx(handle, nullptr, sizePage4K, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        if (!remoteFunc) return;
+    }
+
+    ~TARGETPROC() {
+        VirtualFreeEx(handle, remoteBuffer, 0, MEM_RELEASE);
+        VirtualFreeEx(handle, remoteParam, 0, MEM_RELEASE);
+        VirtualFreeEx(handle, remoteFunc, 0, MEM_RELEASE);
+    }
+
+    explicit operator bool() const { return handle && pId > 0 && remoteBuffer != nullptr && remoteParam != nullptr && remoteFunc != nullptr; }
+};
+
+struct METHOD {
+    static void manualMap();
+};
