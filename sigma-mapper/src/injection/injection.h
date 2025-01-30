@@ -16,12 +16,13 @@ class RAWFILE {
     std::filesystem::path path;
     size_t size;
 
-    uint8_t* buffer;
+    uint8_t* rawBuffer;
+    uint8_t* fixedBuffer;
     PE_HEADER headers;
 
     RAWFILE() = default;
 
-    RAWFILE(std::filesystem::path inPath) : fileName(""), path(inPath), buffer(nullptr), size(0) {
+    RAWFILE(std::filesystem::path inPath) : fileName(""), path(inPath), rawBuffer(nullptr), size(0) {
         fileName           = path.filename().string();
         SMART_HANDLE hFile = CreateFileA(path.string().c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
         if (!hFile) return;
@@ -29,18 +30,21 @@ class RAWFILE {
         size = GetFileSize(hFile, nullptr);
         if (!size) return;
 
-        buffer = static_cast<uint8_t*>(malloc(size));
-        if (!buffer) return;
+        rawBuffer = static_cast<uint8_t*>(malloc(size));
+        if (!rawBuffer) return;
 
-        if (!ReadFile(hFile, buffer, static_cast<DWORD>(size), nullptr, nullptr)) return;
+        if (!ReadFile(hFile, rawBuffer, static_cast<DWORD>(size), nullptr, nullptr)) return;
 
-        headers = buffer;
+        headers = rawBuffer;
         if (!headers) return;
+
+        fixedBuffer = static_cast<uint8_t*>(malloc(headers.OptionalHeader->SizeOfImage));
+        if (!rawBuffer) return;
     }
 
-    ~RAWFILE() { free(buffer); }
+    ~RAWFILE() { free(rawBuffer); }
 
-    explicit operator bool() const { return size > 0 && buffer != nullptr && headers; }
+    explicit operator bool() const { return size > 0 && rawBuffer != nullptr && headers; }
 };
 
 class TARGETPROC {
@@ -50,8 +54,6 @@ class TARGETPROC {
     SMART_HANDLE handle;
 
     uint8_t* remoteBuffer;
-    void* remoteParam;
-    void* remoteFunc;
 
     TARGETPROC(const std::string& procName, const RAWFILE& file, const INJMETHOD& method) : name(procName) {
         pId = util->getPId(name.c_str());
@@ -60,37 +62,14 @@ class TARGETPROC {
         handle = OpenProcess(PROCESS_ALL_ACCESS, 0, pId);
         if (!handle) return;
 
-        if (method == INJMETHOD::MANUALMAP) {
-            remoteBuffer = std::bit_cast<uint8_t*>(
-                VirtualAllocEx(handle, nullptr, file.headers.OptionalHeader->SizeOfImage, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
-            if (!remoteBuffer) return;
-
-            remoteParam = VirtualAllocEx(handle, nullptr, sizeof(MAPPARAM), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-            if (!remoteParam) return;
-
-            remoteFunc = VirtualAllocEx(handle, nullptr, sizePage4K, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-            if (!remoteFunc) return;
-
-        } else if (method == INJMETHOD::LOADLIBRARY) {
-            remoteBuffer =
-                std::bit_cast<uint8_t*>(VirtualAllocEx(handle, nullptr, file.path.string().length() + 0x1, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
-            if (!remoteBuffer) return;
-
-            remoteParam = remoteBuffer;
-            remoteFunc  = remoteBuffer;
-        }
+        remoteBuffer = std::bit_cast<uint8_t*>(
+            VirtualAllocEx(handle, nullptr, file.headers.OptionalHeader->SizeOfImage, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+        if (!remoteBuffer) return;
     }
 
-    ~TARGETPROC() {
-        VirtualFreeEx(handle, remoteBuffer, 0, MEM_RELEASE);
+    ~TARGETPROC() { VirtualFreeEx(handle, remoteBuffer, 0, MEM_RELEASE); }
 
-        if (remoteBuffer == remoteParam) return;
-
-        VirtualFreeEx(handle, remoteParam, 0, MEM_RELEASE);
-        VirtualFreeEx(handle, remoteFunc, 0, MEM_RELEASE);
-    }
-
-    explicit operator bool() const { return handle && pId > 0 && remoteBuffer != nullptr && remoteParam != nullptr && remoteFunc != nullptr; }
+    explicit operator bool() const { return handle && pId > 0 && remoteBuffer != nullptr; }
 };
 
 struct METHOD {
