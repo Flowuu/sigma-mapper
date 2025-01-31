@@ -113,20 +113,14 @@ void METHOD::manualMap(const TARGETPROC& process, const RAWFILE& dll) {
     param.reason   = DLL_PROCESS_ATTACH;
     param.reserved = nullptr;
 
-    void* pParam = VirtualAllocEx(process.handle, nullptr, sizeof(ENTRYPARAM), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    if (!pParam) {
-        console->report(LogLevel::error, "failed to alloc pParam on target proc\n\n");
-        return;
-    }
-
-    if (!WriteProcessMemory(process.handle, pParam, &param, sizeof(ENTRYPARAM), nullptr)) {
+    if (!WriteProcessMemory(process.handle, process.pEntryParam, &param, sizeof(ENTRYPARAM), nullptr)) {
         console->report(LogLevel::error, "failed to write param on target proc\n\n");
         return;
     }
 
     DLLENTRY entry = std::bit_cast<DLLENTRY>(process.remoteBuffer + dll.headers.OptionalHeader->AddressOfEntryPoint);
 
-    SMART_HANDLE hThread = CreateRemoteThread(process.handle, nullptr, 0, std::bit_cast<LPTHREAD_START_ROUTINE>(entry), pParam, 0, nullptr);
+    SMART_HANDLE hThread = CreateRemoteThread(process.handle, nullptr, 0, std::bit_cast<LPTHREAD_START_ROUTINE>(entry), process.pEntryParam, 0, nullptr);
 
     WaitForSingleObject(hThread, INFINITE);
 

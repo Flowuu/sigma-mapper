@@ -4,6 +4,14 @@
 
 enum class INJMETHOD : unsigned int { NONE, LOADLIBRARY, MANUALMAP };
 
+using DLLENTRY = BOOL(__stdcall*)(HINSTANCE, DWORD, LPVOID);
+
+struct ENTRYPARAM {
+    HINSTANCE base;
+    DWORD reason;
+    LPVOID reserved;
+};
+
 struct MAPPARAM {
     uint8_t* buffer;
     decltype(&LoadLibraryA) LoadLibraryAFunc;
@@ -57,8 +65,11 @@ class TARGETPROC {
     SMART_HANDLE handle;
 
     uint8_t* remoteBuffer;
+    void* pEntryParam;
 
-    TARGETPROC(const std::string& procName, const RAWFILE& file, const INJMETHOD& method) : name(procName) {
+    INJMETHOD method;
+
+    TARGETPROC(const std::string& procName, const RAWFILE& file, const INJMETHOD& inMethod) : name(procName), method(inMethod) {
         pId = util->getPId(name.c_str());
         if (!pId) return;
 
@@ -68,19 +79,21 @@ class TARGETPROC {
         remoteBuffer = std::bit_cast<uint8_t*>(
             VirtualAllocEx(handle, nullptr, file.headers.OptionalHeader->SizeOfImage, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
         if (!remoteBuffer) return;
+
+        if (method == INJMETHOD::MANUALMAP) {
+            pEntryParam = std::bit_cast<uint8_t*>(VirtualAllocEx(handle, nullptr, sizeof(ENTRYPARAM), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+            if (!pEntryParam) return;
+        }
     }
 
     ~TARGETPROC() { /*VirtualFreeEx(handle, remoteBuffer, 0, MEM_RELEASE);*/ }
 
-    explicit operator bool() const { return handle && pId > 0 && remoteBuffer != nullptr; }
-};
-
-using DLLENTRY = BOOL(__stdcall*)(HINSTANCE, DWORD, LPVOID);
-
-struct ENTRYPARAM {
-    HINSTANCE base;
-    DWORD reason;
-    LPVOID reserved;
+    explicit operator bool() const {
+        if (method == INJMETHOD::MANUALMAP)
+            return handle && pId > 0 && remoteBuffer != nullptr && pEntryParam != nullptr;
+        else
+            return handle && pId > 0 && remoteBuffer != nullptr;
+    }
 };
 
 struct METHOD {
