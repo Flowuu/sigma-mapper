@@ -18,7 +18,7 @@ bool fixBaseReloc(const TARGETPROC& process, const RAWFILE& dll) {
         unsigned long long entryNum = (baseReloc->SizeOfBlock - sizeof(PIMAGE_BASE_RELOCATION)) / sizeof(WORD);
 
         // current entry ptr
-        WORD* entry = std::bit_cast<WORD*>(baseReloc + 0x1);
+        WORD* entry = std::bit_cast<WORD*>(baseReloc);
 
         // loop each entry
         for (size_t i = 0; i < entryNum; i++, entry++) {

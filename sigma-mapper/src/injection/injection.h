@@ -51,8 +51,8 @@ class RAWFILE {
     }
 
     ~RAWFILE() {
-        free(rawBuffer);
-        free(fixedBuffer);
+        if (rawBuffer != nullptr) VirtualFree(rawBuffer, 0, MEM_RELEASE);
+        if (fixedBuffer != nullptr) VirtualFree(fixedBuffer, 0, MEM_RELEASE);
     }
 
     explicit operator bool() const { return size > 0 && rawBuffer != nullptr && headers; }
