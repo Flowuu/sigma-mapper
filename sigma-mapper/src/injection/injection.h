@@ -86,7 +86,9 @@ class TARGETPROC {
         }
     }
 
-    ~TARGETPROC() { /*VirtualFreeEx(handle, remoteBuffer, 0, MEM_RELEASE);*/ }
+    ~TARGETPROC() { /*VirtualFreeEx(handle, remoteBuffer, 0, MEM_RELEASE);*/
+        if (method == INJMETHOD::MANUALMAP || pEntryParam != nullptr) VirtualFreeEx(handle, pEntryParam, 0, MEM_RELEASE);
+    }
 
     explicit operator bool() const {
         if (method == INJMETHOD::MANUALMAP)
