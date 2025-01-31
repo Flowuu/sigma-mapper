@@ -1,39 +1,88 @@
 #include "injection.h"
 
-bool fixImports(const RAWFILE& dll) {
+bool fixBaseReloc(const TARGETPROC& process, const RAWFILE& dll) {
+    // reloc directory table
+    PIMAGE_BASE_RELOCATION baseReloc =
+        std::bit_cast<PIMAGE_BASE_RELOCATION>(dll.fixedBuffer + dll.headers.OptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress);
+
+    // calculate base delta
+    ULONGLONG locationDelta;
+    if (std::bit_cast<ULONGLONG>(process.remoteBuffer) > dll.headers.OptionalHeader->ImageBase)
+        locationDelta = std::bit_cast<ULONGLONG>(process.remoteBuffer) - dll.headers.OptionalHeader->ImageBase;
+    else
+        locationDelta = dll.headers.OptionalHeader->ImageBase - std::bit_cast<ULONGLONG>(process.remoteBuffer);
+
+    // loop each
+    for (; baseReloc->VirtualAddress != 0; baseReloc += baseReloc->SizeOfBlock) {
+    }
+
+    return true;
+}
+
+bool getImports(const RAWFILE& dll) {
+    // get import directory table
     PIMAGE_IMPORT_DESCRIPTOR importDesc =
         std::bit_cast<PIMAGE_IMPORT_DESCRIPTOR>(dll.fixedBuffer + dll.headers.OptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
 
+    if (importDesc->Name == 0) return false;
+
+    // loop through module/dll's descriptor
     for (; importDesc->Name != 0; importDesc++) {
+        // get module/dll name
         const char* moduleName = std::bit_cast<const char*>(dll.fixedBuffer + importDesc->Name);
         HMODULE hModule        = LoadLibraryA(moduleName);
+        console->log(LogLevel::lightcyan, "[%s]\n", moduleName);
 
         if (!hModule) return false;
 
-        PIMAGE_THUNK_DATA firstThunk    = std::bit_cast<PIMAGE_THUNK_DATA>(dll.fixedBuffer + importDesc->FirstThunk);
+        // address of function
+        PIMAGE_THUNK_DATA firstThunk = std::bit_cast<PIMAGE_THUNK_DATA>(dll.fixedBuffer + importDesc->FirstThunk);
+
+        // address of function name/ordinal
         PIMAGE_THUNK_DATA originalThunk = std::bit_cast<PIMAGE_THUNK_DATA>(dll.fixedBuffer + importDesc->OriginalFirstThunk);
 
         if (!firstThunk && !originalThunk) return false;
 
         for (; originalThunk->u1.AddressOfData != 0; originalThunk++, firstThunk++) {
+            // if ordinal
             if (IMAGE_SNAP_BY_ORDINAL(originalThunk->u1.Ordinal)) {
-                const char* ordinal     = std::bit_cast<const char*>(originalThunk->u1.Ordinal & 0xffff);
+                // get ordinal name
+                const char* ordinal = std::bit_cast<const char*>(originalThunk->u1.Ordinal & 0xffff);
+
+                // map address of function
                 firstThunk->u1.Function = std::bit_cast<ULONGLONG>(GetProcAddress(hModule, ordinal));
+                console->log("    imported %s by ordinal -> 0x%X\n", ordinal, firstThunk->u1.Function);
+
             } else {
+                // get function name
                 PIMAGE_IMPORT_BY_NAME function = std::bit_cast<PIMAGE_IMPORT_BY_NAME>(dll.fixedBuffer + originalThunk->u1.AddressOfData);
-                firstThunk->u1.Function        = std::bit_cast<ULONGLONG>(GetProcAddress(hModule, function->Name));
+
+                // map address of function
+                firstThunk->u1.Function = std::bit_cast<ULONGLONG>(GetProcAddress(hModule, function->Name));
+                console->log("    imported %s by name -> 0x%X\n", function->Name, firstThunk->u1.Function);
             }
         }
+        console->log("\n");
     }
+
+    return true;
 }
 
-void METHOD::manualMap(const TARGETPROC& process, const RAWFILE& dll) {
-    console->log(LogLevel::orange, "[MANUAL MAP]\n\n");
+struct DllEntryArgs {
+    LPVOID base;
+    DWORD reason;
+    LPVOID reserved;
+};
 
+void METHOD::manualMap(const TARGETPROC& process, const RAWFILE& dll) {
+    console->log(LogLevel::orange, "[MANUAL MAP]\n");
+
+    // map the header of dll localy
     std::memcpy(dll.fixedBuffer, dll.rawBuffer, dll.headers.OptionalHeader->SizeOfHeaders);
 
     console->report(LogLevel::success, "mapped headers\n\n");
 
+    // map the sections of dll localy
     for (WORD i = 0; i < dll.headers.FileHeader->NumberOfSections; i++) {
         void* destination     = dll.fixedBuffer + dll.headers.SectionHeader[i].VirtualAddress;
         uint8_t* sectionToMap = dll.rawBuffer + dll.headers.SectionHeader[i].PointerToRawData;
@@ -47,6 +96,17 @@ void METHOD::manualMap(const TARGETPROC& process, const RAWFILE& dll) {
         console->log("    size -> 0x%X\n\n", sizeToMap);
     }
 
-    system("pause");
-    fixImports(dll);
+    // call getImports()
+    if (!getImports(dll)) {
+        console->report(LogLevel::error, "failed to get imports\n\n");
+        return;
+    }
+
+    // call fixBaseReloc()
+    if (!fixBaseReloc(process, dll)) {
+        console->report(LogLevel::error, "failed to fix base reloc\n\n");
+        return;
+    }
+
+    console->report(LogLevel::success, "injected\n\n");
 }
