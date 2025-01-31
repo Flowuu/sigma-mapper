@@ -6,14 +6,30 @@ bool fixBaseReloc(const TARGETPROC& process, const RAWFILE& dll) {
         std::bit_cast<PIMAGE_BASE_RELOCATION>(dll.fixedBuffer + dll.headers.OptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress);
 
     // calculate base delta
-    ULONGLONG locationDelta;
+    ULONGLONG relocationOffset;
     if (std::bit_cast<ULONGLONG>(process.remoteBuffer) > dll.headers.OptionalHeader->ImageBase)
-        locationDelta = std::bit_cast<ULONGLONG>(process.remoteBuffer) - dll.headers.OptionalHeader->ImageBase;
+        relocationOffset = std::bit_cast<ULONGLONG>(process.remoteBuffer) - dll.headers.OptionalHeader->ImageBase;
     else
-        locationDelta = dll.headers.OptionalHeader->ImageBase - std::bit_cast<ULONGLONG>(process.remoteBuffer);
+        relocationOffset = dll.headers.OptionalHeader->ImageBase - std::bit_cast<ULONGLONG>(process.remoteBuffer);
 
-    // loop each
+    // loop each baseReloc block
     for (; baseReloc->VirtualAddress != 0; baseReloc += baseReloc->SizeOfBlock) {
+        // get number of entries inside baseReloc block
+        unsigned long long entryNum = (baseReloc->SizeOfBlock - sizeof(PIMAGE_BASE_RELOCATION)) / sizeof(WORD);
+
+        // current entry ptr
+        WORD* entry = std::bit_cast<WORD*>(baseReloc + 0x1);
+
+        // loop each entry
+        for (size_t i = 0; i < entryNum; i++, entry++) {
+            // check relocation type
+            if (entry[i] >> 0x0C == IMAGE_REL_BASED_DIR64) {
+                uintptr_t* address = std::bit_cast<uintptr_t*>(dll.fixedBuffer + baseReloc->VirtualAddress + (entry[i] & 0xFFF));
+
+                // fix address
+                *address += relocationOffset;
+            }
+        }
     }
 
     return true;
