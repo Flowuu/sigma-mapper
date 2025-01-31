@@ -21,7 +21,7 @@ bool fixBaseReloc(const TARGETPROC& process, const RAWFILE& dll) {
         WORD* entry = std::bit_cast<WORD*>(baseReloc);
 
         // loop each entry
-        for (size_t i = 0; i < entryNum; i++, entry++) {
+        for (unsigned long long i = 0; i < entryNum; i++) {
             // check relocation type
             if (entry[i] >> 0x0C == IMAGE_REL_BASED_DIR64) {
                 uintptr_t* address = std::bit_cast<uintptr_t*>(dll.fixedBuffer + baseReloc->VirtualAddress + (entry[i] & 0xFFF));
