@@ -70,9 +70,17 @@ class TARGETPROC {
         if (!remoteBuffer) return;
     }
 
-    ~TARGETPROC() { VirtualFreeEx(handle, remoteBuffer, 0, MEM_RELEASE); }
+    ~TARGETPROC() { /*VirtualFreeEx(handle, remoteBuffer, 0, MEM_RELEASE);*/ }
 
     explicit operator bool() const { return handle && pId > 0 && remoteBuffer != nullptr; }
+};
+
+using DLLENTRY = BOOL(__stdcall*)(HINSTANCE, DWORD, LPVOID);
+
+struct ENTRYPARAM {
+    HINSTANCE base;
+    DWORD reason;
+    LPVOID reserved;
 };
 
 struct METHOD {
