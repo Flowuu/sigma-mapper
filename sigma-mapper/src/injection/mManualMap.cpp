@@ -84,6 +84,8 @@ bool getImports(const RAWFILE& dll) {
     return true;
 }
 
+void __stdcall remoteCallFunc(CALLPARAM* callParam) { callParam->entry(callParam->base, callParam->reason, callParam->reserved); }
+
 void METHOD::manualMap(const TARGETPROC& process, const RAWFILE& dll) {
     console->log(LogLevel::orange, "[MANUAL MAP]\n");
 
@@ -124,19 +126,27 @@ void METHOD::manualMap(const TARGETPROC& process, const RAWFILE& dll) {
         return;
     }
 
-    ENTRYPARAM param;
-    param.base     = std::bit_cast<HINSTANCE>(process.remoteBuffer);
-    param.reason   = DLL_PROCESS_ATTACH;
-    param.reserved = nullptr;
+    CALLPARAM remoteParam;
+    remoteParam.entry    = std::bit_cast<DLLENTRY>(process.remoteBuffer + dll.headers.OptionalHeader->AddressOfEntryPoint);
+    remoteParam.base     = std::bit_cast<HINSTANCE>(process.remoteBuffer);
+    remoteParam.reason   = DLL_PROCESS_ATTACH;
+    remoteParam.reserved = nullptr;
 
-    if (!WriteProcessMemory(process.handle, process.pEntryParam, &param, sizeof(ENTRYPARAM), nullptr)) {
+    // write entry addr and params to pass
+    if (!WriteProcessMemory(process.handle, process.pCallParam, &remoteParam, sizeof(CALLPARAM), nullptr)) {
+        console->report(LogLevel::error, "failed to write remoteParam on target proc\n\n");
+        return;
+    }
+
+    // write remote call entry function
+    if (!WriteProcessMemory(process.handle, process.pRemoteCall, remoteCallFunc, sizePage4K, nullptr)) {
         console->report(LogLevel::error, "failed to write param on target proc\n\n");
         return;
     }
 
-    DLLENTRY entry = std::bit_cast<DLLENTRY>(process.remoteBuffer + dll.headers.OptionalHeader->AddressOfEntryPoint);
-
-    SMART_HANDLE hThread = CreateRemoteThread(process.handle, nullptr, 0, std::bit_cast<LPTHREAD_START_ROUTINE>(entry), process.pEntryParam, 0, nullptr);
+    // call remote function
+    SMART_HANDLE hThread =
+        CreateRemoteThread(process.handle, nullptr, 0, std::bit_cast<LPTHREAD_START_ROUTINE>(process.pRemoteCall), process.pCallParam, 0, nullptr);
 
     WaitForSingleObject(hThread, INFINITE);
 

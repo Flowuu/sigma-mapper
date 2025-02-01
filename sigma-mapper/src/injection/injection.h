@@ -6,16 +6,12 @@ enum class INJMETHOD : unsigned int { NONE, LOADLIBRARY, MANUALMAP };
 
 using DLLENTRY = BOOL(__stdcall*)(HINSTANCE, DWORD, LPVOID);
 
-struct ENTRYPARAM {
+struct CALLPARAM {
     HINSTANCE base;
     DWORD reason;
     LPVOID reserved;
-};
 
-struct MAPPARAM {
-    uint8_t* buffer;
-    decltype(&LoadLibraryA) LoadLibraryAFunc;
-    decltype(&GetProcAddress) GetProcAddressFunc;
+    DLLENTRY entry;
 };
 
 class RAWFILE {
@@ -65,7 +61,8 @@ class TARGETPROC {
     SMART_HANDLE handle;
 
     uint8_t* remoteBuffer;
-    void* pEntryParam;
+    void* pCallParam;
+    void* pRemoteCall;
 
     INJMETHOD method;
 
@@ -81,18 +78,24 @@ class TARGETPROC {
         if (!remoteBuffer) return;
 
         if (method == INJMETHOD::MANUALMAP) {
-            pEntryParam = std::bit_cast<uint8_t*>(VirtualAllocEx(handle, nullptr, sizeof(ENTRYPARAM), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
-            if (!pEntryParam) return;
+            pCallParam = std::bit_cast<uint8_t*>(VirtualAllocEx(handle, nullptr, sizeof(CALLPARAM), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+            if (!pCallParam) return;
+
+            pRemoteCall = std::bit_cast<uint8_t*>(VirtualAllocEx(handle, nullptr, sizePage4K, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+            if (!pCallParam) return;
         }
     }
 
     ~TARGETPROC() { /*VirtualFreeEx(handle, remoteBuffer, 0, MEM_RELEASE);*/
-        if (method == INJMETHOD::MANUALMAP || pEntryParam != nullptr) VirtualFreeEx(handle, pEntryParam, 0, MEM_RELEASE);
+        if (method == INJMETHOD::MANUALMAP || pCallParam != nullptr || pRemoteCall != nullptr) {
+            VirtualFreeEx(handle, pCallParam, 0, MEM_RELEASE);
+            VirtualFreeEx(handle, pRemoteCall, 0, MEM_RELEASE);
+        }
     }
 
     explicit operator bool() const {
         if (method == INJMETHOD::MANUALMAP)
-            return handle && pId > 0 && remoteBuffer != nullptr && pEntryParam != nullptr;
+            return handle && pId > 0 && remoteBuffer != nullptr && pCallParam != nullptr && pRemoteCall != nullptr;
         else
             return handle && pId > 0 && remoteBuffer != nullptr;
     }
