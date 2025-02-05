@@ -13,23 +13,30 @@ bool fixBaseReloc(const TARGETPROC& process, const RAWFILE& dll) {
         relocationOffset = dll.headers.OptionalHeader->ImageBase - std::bit_cast<ULONGLONG>(process.remoteBuffer);
 
     // loop each baseReloc block
-    for (; baseReloc->VirtualAddress != 0; baseReloc += baseReloc->SizeOfBlock) {
+    for (int tableEntryCounter = 0; baseReloc->VirtualAddress != 0; tableEntryCounter++) {
+        console->log(LogLevel::lightcyan, "[reloc table %d entry]\n", tableEntryCounter);
+
         // get number of entries inside baseReloc block
-        unsigned long long entryNum = (baseReloc->SizeOfBlock - sizeof(PIMAGE_BASE_RELOCATION)) / sizeof(WORD);
+        int entryNum = static_cast<int>((baseReloc->SizeOfBlock - sizeof(PIMAGE_BASE_RELOCATION)) / sizeof(WORD));
 
         // current entry ptr
-        WORD* entry = std::bit_cast<WORD*>(baseReloc);
+        PWORD entry = std::bit_cast<PWORD>(baseReloc);
 
         // loop each entry
-        for (unsigned long long i = 0; i < entryNum; i++) {
+        for (int entryCounter = 0; entryCounter < entryNum; entryCounter++) {
             // check relocation type
-            if (entry[i] >> 0x0C == IMAGE_REL_BASED_DIR64) {
-                uintptr_t* address = std::bit_cast<uintptr_t*>(dll.fixedBuffer + baseReloc->VirtualAddress + (entry[i] & 0xFFF));
+            if (entry[entryCounter] >> 0x0C == IMAGE_REL_BASED_DIR64) {
+                uintptr_t* address = std::bit_cast<uintptr_t*>(dll.fixedBuffer + baseReloc->VirtualAddress + (entry[entryCounter] & 0xFFF));
+
+                console->log("  %d entry relocated 0x%X to ", entryCounter, *address);
 
                 // fix address
                 *address += relocationOffset;
+                console->log("0x%X\n", *address);
             }
         }
+
+        baseReloc = reinterpret_cast<PIMAGE_BASE_RELOCATION>(reinterpret_cast<uintptr_t>(baseReloc) + baseReloc->SizeOfBlock);
     }
 
     return true;
@@ -63,7 +70,7 @@ bool getImports(const RAWFILE& dll) {
             // if ordinal
             if (IMAGE_SNAP_BY_ORDINAL(originalThunk->u1.Ordinal)) {
                 // get ordinal name
-                const char* ordinal = std::bit_cast<const char*>(originalThunk->u1.Ordinal & 0xffff);
+                const char* ordinal = std::bit_cast<const char*>(originalThunk->u1.Ordinal & 0xFFFF);
 
                 // map address of function
                 firstThunk->u1.Function = std::bit_cast<ULONGLONG>(GetProcAddress(hModule, ordinal));
@@ -84,7 +91,7 @@ bool getImports(const RAWFILE& dll) {
     return true;
 }
 
-void __stdcall remoteCallFunc(CALLPARAM* callParam) { callParam->entry(callParam->base, callParam->reason, callParam->reserved); }
+void remoteCallFunc(CALLPARAM* callParam) { callParam->entry(callParam->base, callParam->reason, callParam->reserved); }
 
 void METHOD::manualMap(const TARGETPROC& process, const RAWFILE& dll) {
     console->log(LogLevel::orange, "[MANUAL MAP]\n");
